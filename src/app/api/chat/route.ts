@@ -17,10 +17,11 @@ export async function POST(req: NextRequest) {
     const agentResponse = await runAgent(message);
 
     return NextResponse.json(agentResponse);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Chat API error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     return NextResponse.json(
-      { error: 'An error occurred while processing your request.', message: error.message },
+      { error: 'An error occurred while processing your request.', message: errorMessage },
       { status: 500 },
     );
   }

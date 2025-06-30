@@ -3,14 +3,55 @@ import {
   Runner,
   webSearchTool,
   hostedMcpTool,
+  InputGuardrail,
+  InputGuardrailTripwireTriggered,
 } from '@openai/agents';
+import { z } from 'zod';
 import { Product } from '@/lib/types';
+
+interface AgentMessage {
+  role: string;
+  content?: string | Array<{ type: string; text?: string }>;
+  name?: string;
+}
+
+interface AgentResponse {
+  output?: AgentMessage[];
+}
+
+interface ContentBlock {
+  type: string;
+  text?: string;
+}
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error('OPENAI_API_KEY not found in environment variables');
 }
 
 const SHOPIFY_MCP_SERVER_URL = 'https://testecomchatbot.myshopify.com/api/mcp';
+
+const VagueQueryOutput = z.object({
+  is_vague_or_nonsensical: z.boolean(),
+  reasoning: z.string(),
+});
+
+const queryGuardrailAgent = new Agent({
+  name: 'QueryGuardrailAgent',
+  instructions:
+    'Check if the user query is vague (e.g., "something cool") or nonsensical (e.g., "asdfgh").',
+  outputType: VagueQueryOutput,
+});
+
+const queryGuardrail: InputGuardrail = {
+  name: 'VagueQueryGuardrail',
+  execute: async ({ input, context }) => {
+    const result = await runner.run(queryGuardrailAgent, input, { context });
+    return {
+      outputInfo: result.finalOutput,
+      tripwireTriggered: result.finalOutput?.is_vague_or_nonsensical ?? false,
+    };
+  },
+};
 
 const productAgent = new Agent({
   model: 'gpt-4.1-mini',
@@ -30,12 +71,13 @@ const productAgent = new Agent({
       serverUrl: SHOPIFY_MCP_SERVER_URL,
     }),
   ],
+  inputGuardrails: [queryGuardrail],
 });
 
 const runner = new Runner();
 
 function processAgentResponse(response: any): { answer: string; products: Product[] } {
-  let answer = 'Sorry, I could not generate a response.';
+  let answer = 'Sorry, I am unable to provide a response.';
   let products: Product[] = [];
 
   if (!response?.output) {
@@ -83,8 +125,21 @@ function processAgentResponse(response: any): { answer: string; products: Produc
 export async function runAgent(
   query: string,
 ): Promise<{ answer: string; products: Product[] }> {
-  console.log(`Running agent with query: "${query}"`);
-  const response = await runner.run(productAgent, query);
-  console.log('Agent run completed. Processing response.');
-  return processAgentResponse(response);
+  try {
+    const response = await runner.run(productAgent, query);
+    return processAgentResponse(response);
+  } catch (e) {
+    if (e instanceof InputGuardrailTripwireTriggered) {
+      return {
+        answer:
+          'Your query is a bit too vague. Could you please provide more details about what you are looking for?',
+        products: [],
+      };
+    }
+    console.error('Error running agent:', e);
+    return {
+      answer: 'An unexpected error occurred. Please try again.',
+      products: [],
+    };
+  }
 }

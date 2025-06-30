@@ -21,12 +21,12 @@ export default function ProductCard({ product }: ProductCardProps) {
       <div className="flex space-x-4 items-center">
         {product.featuredImage && (
           <div className="flex-shrink-0">
-            <img
+            {/* <img
               src={product.featuredImage.url}
               alt={product.featuredImage.altText || product.title}
               className="w-20 h-20 object-cover rounded-md border"
               loading="lazy"
-            />
+            /> */}
           </div>
         )}
         <div className="flex-grow">
