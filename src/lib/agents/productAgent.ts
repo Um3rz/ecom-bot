@@ -9,21 +9,6 @@ import {
 import { z } from 'zod';
 import { Product } from '@/lib/types';
 
-interface AgentMessage {
-  role: string;
-  content?: string | Array<{ type: string; text?: string }>;
-  name?: string;
-}
-
-interface AgentResponse {
-  output?: AgentMessage[];
-}
-
-interface ContentBlock {
-  type: string;
-  text?: string;
-}
-
 if (!process.env.OPENAI_API_KEY) {
   throw new Error('OPENAI_API_KEY not found in environment variables');
 }
@@ -70,8 +55,7 @@ const productAgent = new Agent({
       serverLabel: 'Shopify_Storefront_Tools',
       serverUrl: SHOPIFY_MCP_SERVER_URL,
     }),
-  ],
-  inputGuardrails: [queryGuardrail],
+  ]
 });
 
 const runner = new Runner();
